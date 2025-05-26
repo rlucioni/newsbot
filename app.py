@@ -89,6 +89,10 @@ def run():
 
     # TODO: map from full link to short representation, then replace, to reduce mistakes
     # TODO: resolve google news links (playwright?), provide article text
+    # might require custom docker image for deployment:
+    # - https://github.com/zappa/Zappa?tab=readme-ov-file#docker-workflows
+    # - https://ianwhitestone.work/zappa-serverless-docker/
+    # - https://www.steele.blue/playwright-on-lambda/
     news = []
     for item in items:
         news.append(f'<item>{item.title}{item.link}</item>')
