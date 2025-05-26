@@ -87,6 +87,8 @@ def run():
 
     print(f'got {len(items)} news items')
 
+    # TODO: map from full link to short representation, then replace, to reduce mistakes
+    # TODO: resolve google news links (playwright?), provide article text
     news = []
     for item in items:
         news.append(f'<item>{item.title}{item.link}</item>')
