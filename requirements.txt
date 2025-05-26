@@ -1,6 +1,6 @@
-beautifulsoup4==4.6.3
-boto3==1.7.4
-flake8==3.6.0
-requests==2.20.1
-sendgrid==5.6.0
-zappa==0.47.0
+beautifulsoup4==4.13.4
+flake8==7.2.0
+google-genai==1.16.1
+lxml==5.4.0
+python-dotenv==1.1.0
+requests==2.32.3
