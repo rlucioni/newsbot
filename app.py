@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import datetime
 from logging.config import dictConfig
 
@@ -49,9 +50,39 @@ MODELS = {
     },
 }
 
+ITEM_TEMPLATE = """<item>
+  <title>{title}</title>
+  <url>{url}</url>
+  <content>{content}</content>
+</item>
+"""
+
 gemini = genai.Client(
     http_options=genai.types.HttpOptions(timeout=120 * 1000)
 )
+
+
+class Timer:
+    def __init__(self):
+        self.t0 = time.time()
+
+    def done(self):
+        self.latency = time.time() - self.t0
+
+
+class ProgressMeter:
+    def __init__(self, total, msg='{done}/{total} ({percent}%) done', mod=10):
+        self.total = total
+        self.done = 0
+        self.msg = msg
+        self.mod = mod
+
+    def increment(self):
+        self.done += 1
+
+        if self.done % self.mod == 0:
+            percent = round((self.done / self.total) * 100)
+            print(self.msg.format(done=self.done, total=self.total, percent=percent))
 
 
 def make_prompt():
@@ -78,51 +109,98 @@ def estimate_cost(res):
 
 def run():
     session = requests.Session()
+    session.headers.update({
+        'User-Agent': (
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) '
+            'Chrome/136.0.0.0 Safari/537.36'
+        )
+    })
 
-    url = 'https://news.google.com/rss/search?q=site:apnews.com+when:1d'
-    response = session.get(url)
+    home_response = session.get('https://apnews.com/')
+    home_soup = BeautifulSoup(home_response.text, 'html.parser')
+    links = home_soup.select('.PagePromo-title')
 
-    soup = BeautifulSoup(response.text, 'lxml-xml')
-    items = soup.find_all('item')
+    logger.info(f'found {len(links)} links')
 
-    print(f'got {len(items)} news items')
+    article_timer = Timer()
+    link_progress = ProgressMeter(len(links), msg='tried {done}/{total} ({percent}%) links')
 
-    # TODO: map from full link to short representation, then replace, to reduce mistakes
-    # TODO: resolve google news links (playwright?), provide article text
-    # might require custom docker image for deployment:
-    # - https://github.com/zappa/Zappa?tab=readme-ov-file#docker-workflows
-    # - https://ianwhitestone.work/zappa-serverless-docker/
-    # - https://www.steele.blue/playwright-on-lambda/
-    news = []
-    for item in items:
-        news.append(f'<item>{item.title}{item.link}</item>')
+    articles = {}
+    for link in links:
+        link_href = link.select_one('a').get('href')
+        if '/article/' not in link_href:
+            logger.info(f'skipping non-article link: {link_href}')
+            link_progress.increment()
+            continue
 
-    joined_news = '\n'.join(news)
+        # Articles can be linked to multiple times. For example, a link can appear
+        # in a regular section on the homepage and also in a "popular" section.
+        # Prefer the link with the most information in the title.
+        article_title = link.get_text(strip=True)
+        known_article = articles.get(link_href)
+        if known_article and len(known_article['title']) >= len(article_title):
+            logger.info(f'skipping known article link: {link_href}')
+            link_progress.increment()
+            continue
 
-    # home_res = session.get('https://apnews.com/')
-    # soup = BeautifulSoup(home_res.text, 'html.parser')
-    # links = soup.select('.PagePromo-title')
+        logger.info(f'getting content for article link: {link_href} ({article_title})')
 
-    # TODO: dedupe article urls? keep one with longest title? combat duplicates
-    # that can appear in "trending" section
-    # link = links[0]
-    # article_title = link.get_text(strip=True)
-    # article_url = link.select_one('a').get('href')
-    # article_res = session.get(article_url)
-    # article_soup = BeautifulSoup(article_res.text, 'html.parser')
-    # ps = article_soup.select('.RichTextStoryBody p')
-    # texts = [p.get_text(strip=True) for p in ps]
-    # article_text = ' '.join(texts)
+        article_response = session.get(link_href)
+        article_soup = BeautifulSoup(article_response.text, 'html.parser')
+        p_tags = article_soup.select('.RichTextStoryBody > p')
+
+        contents = []
+        for p_tag in p_tags:
+            # Avoid stripping internal whitespace (e.g., around <a> text)
+            content = p_tag.get_text().strip()
+
+            # Some articles end with notes below a horizontal rule of varying length. We don't need them.
+            if content.startswith('__') or content.startswith('——'):
+                break
+
+            contents.append(content)
+
+        article_content = ' '.join(contents)
+
+        if not article_content:
+            logger.info(f'got empty content for article link: {link_href}')
+            link_progress.increment()
+
+        articles[link_href] = {
+            'title': article_title,
+            'url': link_href,
+            'content': article_content,
+        }
+
+        link_progress.increment()
+        time.sleep(3)
+
+    article_timer.done()
+    logger.info(f'loaded {len(articles)} articles ({round(article_timer.latency, 2)}s)')
+
+    # TODO: map from full article url to short representation, then replace, to reduce mistakes
+    items = []
+    for article in articles.values():
+        item = ITEM_TEMPLATE.format(
+            title=article.title,
+            url=article.url,
+            content=article.content
+        )
+
+        items.append(item)
+
+    joined_items = ''.join(items)
 
     contents = [
         genai.types.Content(
             role='user',
             parts=[
-                genai.types.Part.from_text(text=joined_news),
+                genai.types.Part.from_text(text=joined_items),
             ]
         ),
     ]
 
+    generation_timer = Timer()
     res = gemini.models.generate_content(
         model='gemini-2.5-flash-preview-05-20',
         # model='gemini-2.5-pro-preview-05-06',
@@ -132,8 +210,9 @@ def run():
         ),
         contents=contents
     )
+    generation_timer.done()
 
     print(res.text)
 
     cost = estimate_cost(res)
-    print(f'estimated cost: {round(cost, 4)}')
+    print(f'cost: ${round(cost, 4)}, latency: {round(generation_timer.latency, 2)}s')

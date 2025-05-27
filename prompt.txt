@@ -1,4 +1,4 @@
-You'll be given a bunch of news items in <item> tags. Each item will have a <title> and <link>. The news items will be in no particular order. It is currently {date}.
+You'll be given a bunch of news items in <item> tags. Each item will have a <title>, <url>, and <content>. The news items will be in no particular order. It is currently {date}.
 
 Your job is to turn the news items into Markdown-formatted output that reads like the "What's News" section found on the front page of The Wall Street Journal. The "What's News" section serves as a concise summary of the most important news across various categories, allowing readers to quickly grasp the day's key developments. Its hallmarks are:
 
@@ -10,9 +10,9 @@ Your job is to turn the news items into Markdown-formatted output that reads lik
 
 In essence, the "What's News" section is written in a succinct, factual, and categorized manner, designed to give readers a rapid overview of the day's most important news stories. It acts as an entry point, encouraging readers to delve into the full articles for more in-depth coverage.
 
-Keep in mind that you don't need to include all of the provided news items in your output. Select only the most important ones, then order and categorize them appropriately.
+Don't include all of the provided news items in your output. Select only the ones that seem most important, then order and categorize them appropriately.
 
-In addition, immediately following each news item, the "What's News" section in the print version of the paper would typically reference part of the paper where you could read more about each news item (e.g., A1, B4). You should instead provide a parenthesized, Markdown-formatted link to the news item's <link>, using "more" as the link text.
+In addition, immediately following each news item, the "What's News" section in the print version of the paper would typically reference part of the paper where you could read more about each news item (e.g., A1, B4). You should instead provide a parenthesized, Markdown-formatted link to the news item's <url>, using "AP" as the link text.
 
 To tie it all together, here's an example of the kind of output you should produce:
 
@@ -21,11 +21,11 @@ To tie it all together, here's an example of the kind of output you should produ
 
 ## Business and Finance
 
-- **The Bank of England** raised interest rates by a half percentage point, the most in more than 25 years, even as it predicted the U.K. economy will fall into recession this year. ([more](<link>))
-- **Warner Bros. Discovery** is exploring launching a free, ad-supported streaming service, the latest effort by a streaming giant to reach a broader audience as competition for users intensifies. ([more](<link>))
+- **The Bank of England** raised interest rates by a half percentage point, the most in more than 25 years, even as it predicted the U.K. economy will fall into recession this year. ([AP](<url>))
+- **Warner Bros. Discovery** is exploring launching a free, ad-supported streaming service, the latest effort by a streaming giant to reach a broader audience as competition for users intensifies. ([AP](<url>))
 
 ## World News
 
-- **China encircled Taiwan** with rocket and ballistic-missile fire while testing the democratic self-governing island’s defenses with navy ships and warplanes, as Beijing protested a visit by Pelosi. ([more](<link>))
-- **Ukrainian forces struck** a railway bridge in the southern Kherson region, the Ukrainian military said, as it seeks to cut Moscow’s supply lines in preparation for a looming counteroffensive. ([more](<link>))
+- **China encircled Taiwan** with rocket and ballistic-missile fire while testing the democratic self-governing island’s defenses with navy ships and warplanes, as Beijing protested a visit by Pelosi. ([AP](<url>))
+- **Ukrainian forces struck** a railway bridge in the southern Kherson region, the Ukrainian military said, as it seeks to cut Moscow’s supply lines in preparation for a looming counteroffensive. ([AP](<url>))
 ```
