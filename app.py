@@ -99,6 +99,21 @@ def run():
 
     joined_news = '\n'.join(news)
 
+    # home_res = session.get('https://apnews.com/')
+    # soup = BeautifulSoup(home_res.text, 'html.parser')
+    # links = soup.select('.PagePromo-title')
+
+    # TODO: dedupe article urls? keep one with longest title? combat duplicates
+    # that can appear in "trending" section
+    # link = links[0]
+    # article_title = link.get_text(strip=True)
+    # article_url = link.select_one('a').get('href')
+    # article_res = session.get(article_url)
+    # article_soup = BeautifulSoup(article_res.text, 'html.parser')
+    # ps = article_soup.select('.RichTextStoryBody p')
+    # texts = [p.get_text(strip=True) for p in ps]
+    # article_text = ' '.join(texts)
+
     contents = [
         genai.types.Content(
             role='user',
