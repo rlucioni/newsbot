@@ -2,6 +2,7 @@ import logging
 import time
 from datetime import datetime
 from logging.config import dictConfig
+from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
@@ -50,7 +51,7 @@ MODELS = {
     },
 }
 
-ITEM_TEMPLATE = """<item>
+ITEM_XML_TEMPLATE = """<item>
   <title>{title}</title>
   <url>{url}</url>
   <content>{content}</content>
@@ -82,7 +83,7 @@ class ProgressMeter:
 
         if self.done % self.mod == 0:
             percent = round((self.done / self.total) * 100)
-            print(self.msg.format(done=self.done, total=self.total, percent=percent))
+            logger.info(self.msg.format(done=self.done, total=self.total, percent=percent))
 
 
 def make_prompt():
@@ -107,7 +108,7 @@ def estimate_cost(res):
     return input_cost + output_cost
 
 
-def run():
+def run(with_cache=True):
     session = requests.Session()
     session.headers.update({
         'User-Agent': (
@@ -116,94 +117,101 @@ def run():
         )
     })
 
-    home_response = session.get('https://apnews.com/')
-    home_soup = BeautifulSoup(home_response.text, 'html.parser')
-    links = home_soup.select('.PagePromo-title')
+    items_xml = None
+    cache_path = Path('items.xml')
 
-    logger.info(f'found {len(links)} links')
+    if with_cache and cache_path.exists():
+        items_xml = cache_path.read_text()
 
-    article_timer = Timer()
-    link_progress = ProgressMeter(len(links), msg='tried {done}/{total} ({percent}%) links')
+    if not items_xml:
+        home_response = session.get('https://apnews.com/')
+        home_soup = BeautifulSoup(home_response.text, 'html.parser')
+        links = home_soup.select('.PagePromo-title')
 
-    articles = {}
-    for link in links:
-        link_href = link.select_one('a').get('href')
-        if '/article/' not in link_href:
-            logger.info(f'skipping non-article link: {link_href}')
+        logger.info(f'found {len(links)} links')
+
+        article_timer = Timer()
+        link_progress = ProgressMeter(len(links), msg='tried {done}/{total} links ({percent}%)')
+
+        articles = {}
+        for link in links:
+            link_href = link.select_one('a').get('href')
+            if '/article/' not in link_href:
+                logger.info(f'skipping non-article link: {link_href}')
+                link_progress.increment()
+                continue
+
+            # Articles can be linked to multiple times. For example, a link can appear
+            # in a regular section on the homepage and also in a "popular" section.
+            # Prefer the link with the most information in the title.
+            article_title = link.get_text(strip=True)
+            known_article = articles.get(link_href)
+            if known_article and len(known_article['title']) >= len(article_title):
+                logger.info(f'skipping known article link: {link_href}')
+                link_progress.increment()
+                continue
+
+            logger.info(f'getting content for article link: {link_href} ({article_title})')
+
+            article_response = session.get(link_href)
+            article_soup = BeautifulSoup(article_response.text, 'html.parser')
+            p_tags = article_soup.select('.RichTextStoryBody > p')
+
+            contents = []
+            for p_tag in p_tags:
+                # Avoid stripping internal whitespace (e.g., around <a> text)
+                content = p_tag.get_text().strip()
+
+                # Some articles end with notes below a horizontal rule of varying length. We don't need them.
+                if content.startswith('__') or content.startswith('——'):
+                    break
+
+                contents.append(content)
+
+            article_content = ' '.join(contents)
+
+            if not article_content:
+                logger.info(f'got empty content for article link: {link_href}')
+
+            articles[link_href] = {
+                'title': article_title,
+                'url': link_href,
+                'content': article_content,
+            }
+
             link_progress.increment()
-            continue
+            time.sleep(3)
 
-        # Articles can be linked to multiple times. For example, a link can appear
-        # in a regular section on the homepage and also in a "popular" section.
-        # Prefer the link with the most information in the title.
-        article_title = link.get_text(strip=True)
-        known_article = articles.get(link_href)
-        if known_article and len(known_article['title']) >= len(article_title):
-            logger.info(f'skipping known article link: {link_href}')
-            link_progress.increment()
-            continue
+        article_timer.done()
+        logger.info(f'loaded {len(articles)} articles in {round(article_timer.latency, 2)}s')
 
-        logger.info(f'getting content for article link: {link_href} ({article_title})')
+        # TODO: map from full article url to short representation, then replace, to reduce mistakes
+        items_xml = ''
+        for article in articles.values():
+            item_xml = ITEM_XML_TEMPLATE.format(
+                title=article['title'],
+                url=article['url'],
+                content=article['content']
+            )
 
-        article_response = session.get(link_href)
-        article_soup = BeautifulSoup(article_response.text, 'html.parser')
-        p_tags = article_soup.select('.RichTextStoryBody > p')
+            items_xml += item_xml
 
-        contents = []
-        for p_tag in p_tags:
-            # Avoid stripping internal whitespace (e.g., around <a> text)
-            content = p_tag.get_text().strip()
-
-            # Some articles end with notes below a horizontal rule of varying length. We don't need them.
-            if content.startswith('__') or content.startswith('——'):
-                break
-
-            contents.append(content)
-
-        article_content = ' '.join(contents)
-
-        if not article_content:
-            logger.info(f'got empty content for article link: {link_href}')
-            link_progress.increment()
-
-        articles[link_href] = {
-            'title': article_title,
-            'url': link_href,
-            'content': article_content,
-        }
-
-        link_progress.increment()
-        time.sleep(3)
-
-    article_timer.done()
-    logger.info(f'loaded {len(articles)} articles ({round(article_timer.latency, 2)}s)')
-
-    # TODO: map from full article url to short representation, then replace, to reduce mistakes
-    items = []
-    for article in articles.values():
-        item = ITEM_TEMPLATE.format(
-            title=article.title,
-            url=article.url,
-            content=article.content
-        )
-
-        items.append(item)
-
-    joined_items = ''.join(items)
+        if with_cache:
+            cache_path.write_text(items_xml)
 
     contents = [
         genai.types.Content(
             role='user',
             parts=[
-                genai.types.Part.from_text(text=joined_items),
+                genai.types.Part.from_text(text=items_xml),
             ]
         ),
     ]
 
     generation_timer = Timer()
     res = gemini.models.generate_content(
-        model='gemini-2.5-flash-preview-05-20',
-        # model='gemini-2.5-pro-preview-05-06',
+        # model='gemini-2.5-flash-preview-05-20',
+        model='gemini-2.5-pro-preview-05-06',
         config=genai.types.GenerateContentConfig(
             system_instruction=make_prompt(),
             temperature=0,
@@ -212,7 +220,10 @@ def run():
     )
     generation_timer.done()
 
-    print(res.text)
+    logger.info(res.text)
+    logger.info(f'input tokens: {res.usage_metadata.prompt_token_count}')
+    logger.info(f'output tokens: {res.usage_metadata.candidates_token_count}')
+    logger.info(f'latency: {round(generation_timer.latency, 2)}s')
 
     cost = estimate_cost(res)
-    print(f'cost: ${round(cost, 4)}, latency: {round(generation_timer.latency, 2)}s')
+    logger.info(f'cost: ${round(cost, 4)}')
