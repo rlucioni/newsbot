@@ -108,7 +108,7 @@ def estimate_cost(res):
     return input_cost + output_cost
 
 
-def run(with_cache=True):
+def run(with_cache=False):
     session = requests.Session()
     session.headers.update({
         'User-Agent': (
@@ -135,52 +135,61 @@ def run(with_cache=True):
 
         articles = {}
         for link in links:
-            link_href = link.select_one('a').get('href')
-            if '/article/' not in link_href:
-                logger.info(f'skipping non-article link: {link_href}')
+            try:
+                a_tag = link.select_one('a')
+                if not a_tag:
+                    logger.info('skipping link with no <a> tag')
+                    link_progress.increment()
+                    continue
+
+                link_href = a_tag.get('href')
+                if '/article/' not in link_href:
+                    logger.info(f'skipping non-article link: {link_href}')
+                    link_progress.increment()
+                    continue
+
+                # Articles can be linked to multiple times. For example, a link can appear
+                # in a regular section on the homepage and also in a "popular" section.
+                # Prefer the link with the most information in the title.
+                article_title = link.get_text(strip=True)
+                known_article = articles.get(link_href)
+                if known_article and len(known_article['title']) >= len(article_title):
+                    logger.info(f'skipping known article link: {link_href}')
+                    link_progress.increment()
+                    continue
+
+                logger.info(f'getting content for article link: {link_href} ({article_title})')
+
+                article_response = session.get(link_href)
+                article_soup = BeautifulSoup(article_response.text, 'html.parser')
+                p_tags = article_soup.select('.RichTextStoryBody > p')
+
+                contents = []
+                for p_tag in p_tags:
+                    # Avoid stripping internal whitespace (e.g., around <a> text)
+                    content = p_tag.get_text().strip()
+
+                    # Some articles end with notes below a horizontal rule of varying length. We don't need them.
+                    if content.startswith('__') or content.startswith('——'):
+                        break
+
+                    contents.append(content)
+
+                article_content = ' '.join(contents)
+
+                if not article_content:
+                    logger.info(f'got empty content for article link: {link_href}')
+
+                articles[link_href] = {
+                    'title': article_title,
+                    'url': link_href,
+                    'content': article_content,
+                }
+            except:
+                logger.exception('failed to handle link')
+            finally:
                 link_progress.increment()
-                continue
-
-            # Articles can be linked to multiple times. For example, a link can appear
-            # in a regular section on the homepage and also in a "popular" section.
-            # Prefer the link with the most information in the title.
-            article_title = link.get_text(strip=True)
-            known_article = articles.get(link_href)
-            if known_article and len(known_article['title']) >= len(article_title):
-                logger.info(f'skipping known article link: {link_href}')
-                link_progress.increment()
-                continue
-
-            logger.info(f'getting content for article link: {link_href} ({article_title})')
-
-            article_response = session.get(link_href)
-            article_soup = BeautifulSoup(article_response.text, 'html.parser')
-            p_tags = article_soup.select('.RichTextStoryBody > p')
-
-            contents = []
-            for p_tag in p_tags:
-                # Avoid stripping internal whitespace (e.g., around <a> text)
-                content = p_tag.get_text().strip()
-
-                # Some articles end with notes below a horizontal rule of varying length. We don't need them.
-                if content.startswith('__') or content.startswith('——'):
-                    break
-
-                contents.append(content)
-
-            article_content = ' '.join(contents)
-
-            if not article_content:
-                logger.info(f'got empty content for article link: {link_href}')
-
-            articles[link_href] = {
-                'title': article_title,
-                'url': link_href,
-                'content': article_content,
-            }
-
-            link_progress.increment()
-            time.sleep(3)
+                time.sleep(3)
 
         article_timer.done()
         logger.info(f'loaded {len(articles)} articles in {round(article_timer.latency, 2)}s')
@@ -227,3 +236,12 @@ def run(with_cache=True):
 
     cost = estimate_cost(res)
     logger.info(f'cost: ${round(cost, 4)}')
+
+
+def exception_handler(exception, event, context):
+    logger.error('unhandled exception:', exc_info=exception)
+
+    # Tells Zappa not to re-raise the exception, which in turn prevents Lambda
+    # from retrying invocation.
+    # https://github.com/zappa/Zappa/blob/0.60.1/zappa/handler.py#L252-L255
+    return True

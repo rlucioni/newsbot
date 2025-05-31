@@ -1,0 +1,28 @@
+{
+  "prod": {
+    "apigateway_enabled": false,
+    "aws_region": "us-east-1",
+    "exception_handler": "app.exception_handler",
+    "exclude": [
+      "__pycache__",
+      ".env.private",
+      ".flake8",
+      ".gitignore",
+      ".python-version",
+      "items.xml",
+      "LICENSE",
+      "Makefile",
+      "prune.py",
+      "README.md",
+      "requirements.txt",
+      "zappa_settings.json"
+    ],
+    "keep_warm": false,
+    "memory_size": 512,
+    "profile_name": "default",
+    "project_name": "newsbot",
+    "runtime": "python3.13",
+    "s3_bucket": "newsbot-prod",
+    "timeout_seconds": 600
+  }
+}
