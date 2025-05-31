@@ -208,6 +208,10 @@ def run(with_cache=False):
         if with_cache:
             cache_path.write_text(items_xml)
 
+    if not items_xml:
+        logger.info('aborting, no news items')
+        return
+
     contents = [
         genai.types.Content(
             role='user',
