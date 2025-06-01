@@ -209,13 +209,11 @@ def run():
                 a_tag = link.select_one('a')
                 if not a_tag:
                     logger.info('skipping link with no <a> tag')
-                    link_progress.increment()
                     continue
 
                 link_href = a_tag.get('href')
                 if '/article/' not in link_href:
                     logger.info(f'skipping non-article link: {link_href}')
-                    link_progress.increment()
                     continue
 
                 # Articles can be linked to multiple times. For example, a link can appear
@@ -225,7 +223,6 @@ def run():
                 known_article = articles.get(link_href)
                 if known_article and len(known_article['title']) >= len(article_title):
                     logger.info(f'skipping known article link: {link_href}')
-                    link_progress.increment()
                     continue
 
                 logger.info(f'getting content for article link: {link_href} ({article_title})')
