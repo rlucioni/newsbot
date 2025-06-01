@@ -1,16 +1,22 @@
 import logging
+import os
 import time
 from datetime import datetime
 from logging.config import dictConfig
 from pathlib import Path
 
+import mistletoe
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from google import genai
+from slack_sdk import WebClient
 
 
 load_dotenv('.env.private')
+
+SLACK_BOT_TOKEN = os.environ['SLACK_BOT_TOKEN']
+SLACK_CHANNEL_ID = os.environ['SLACK_CHANNEL_ID']
 
 dictConfig({
     'version': 1,
@@ -38,6 +44,8 @@ dictConfig({
 })
 
 logger = logging.getLogger(__name__)
+
+slack = WebClient(token=SLACK_BOT_TOKEN)
 
 # https://ai.google.dev/gemini-api/docs/pricing
 MODELS = {
@@ -86,11 +94,15 @@ class ProgressMeter:
             logger.info(self.msg.format(done=self.done, total=self.total, percent=percent))
 
 
+def get_date():
+    return datetime.now().strftime('%A, %B %-d, %Y')
+
+
 def make_prompt():
     with open('prompt.txt') as f:
         prompt = f.read()
 
-    return prompt.format(date=datetime.now().strftime('%B %d, %Y'))
+    return prompt.format(date=get_date())
 
 
 def estimate_cost(res):
@@ -108,6 +120,62 @@ def estimate_cost(res):
     return input_cost + output_cost
 
 
+def make_blocks(content):
+    blocks = []
+
+    rendered = mistletoe.markdown(content)
+    soup = BeautifulSoup(rendered, 'lxml')
+
+    h1_tag = soup.find('h1')
+    blocks.append({
+        'type': 'header',
+        'text': {
+            'type': 'plain_text',
+            'text': h1_tag.get_text(),
+        },
+    })
+
+    for h2_tag in soup.find_all('h2'):
+        blocks.extend([
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": h2_tag.get_text(),
+                }
+            },
+            {
+                "type": "divider",
+            },
+        ])
+
+        ul_tag = h2_tag.find_next_sibling('ul')
+        for li_tag in ul_tag.find_all('li'):
+            mrkdwn_parts = ['◆ ']
+
+            for content in li_tag.contents:
+                if content.name == 'strong':
+                    mrkdwn_parts.append(f'*{content.get_text()}*')
+                elif content.name == 'a':
+                    href = content.get('href')
+                    text = content.get_text()
+                    mrkdwn_parts.append(f'<{href}|{text}>')
+                else:
+                    mrkdwn_parts.append(content.get_text())
+
+            mrkdwn = ''.join(mrkdwn_parts)
+
+            blocks.append({
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": mrkdwn,
+                }
+            })
+
+    return blocks
+
+
 def run(with_cache=False):
     session = requests.Session()
     session.headers.update({
@@ -121,11 +189,12 @@ def run(with_cache=False):
     cache_path = Path('items.xml')
 
     if with_cache and cache_path.exists():
+        logger.info('found cached news items')
         items_xml = cache_path.read_text()
 
     if not items_xml:
         home_response = session.get('https://apnews.com/')
-        home_soup = BeautifulSoup(home_response.text, 'html.parser')
+        home_soup = BeautifulSoup(home_response.text, 'lxml')
         links = home_soup.select('.PagePromo-title')
 
         logger.info(f'found {len(links)} links')
@@ -223,7 +292,6 @@ def run(with_cache=False):
 
     generation_timer = Timer()
     res = gemini.models.generate_content(
-        # model='gemini-2.5-flash-preview-05-20',
         model='gemini-2.5-pro-preview-05-06',
         config=genai.types.GenerateContentConfig(
             system_instruction=make_prompt(),
@@ -240,6 +308,15 @@ def run(with_cache=False):
 
     cost = estimate_cost(res)
     logger.info(f'cost: ${round(cost, 4)}')
+
+    logger.info('pinging slack')
+    blocks = make_blocks(res.text)
+    slack.chat_postMessage(
+        channel=SLACK_CHANNEL_ID,
+        blocks=blocks,
+        # fallback text for notifications only
+        text=f'News for {get_date()}'
+    )
 
 
 def exception_handler(exception, event, context):

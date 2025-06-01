@@ -2,4 +2,5 @@ __pycache__/
 .DS_Store
 .env.private
 .python-version
+example.md
 items.xml

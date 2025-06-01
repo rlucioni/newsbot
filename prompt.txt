@@ -1,6 +1,6 @@
-You'll be given a bunch of news items in <item> tags. Each item will have a <title>, <url>, and <content>. The news items will be in no particular order. It is currently {date}.
+Today is {date}. You'll be given a bunch of news items in <item> tags. Each item will have a title in <title> tags, a URL in <url> tags, and content in <content> tags. The news items will be in no particular order.
 
-Turn the news items into Markdown-formatted output in the style of the "What's News" section found on the front page of The Wall Street Journal. The "What's News" section serves as a concise summary of the most important news across various categories, allowing readers to quickly grasp the day's key developments. Its hallmarks are:
+Turn the date and news items into Markdown-formatted output in the style of the "What's News" section found on the front page of The Wall Street Journal. The "What's News" section serves as a concise summary of the most important news across various categories, allowing readers to quickly grasp the day's key developments. Its hallmarks are:
 
 1. Brevity and conciseness: The writing in the "What's News" section is characterized by its brevity. Each news item is just one or two sentences, delivering the essential facts without extensive detail. This allows for a large number of updates to fit in a compact space.
 2. Direct and factual language: The language used is direct and to the point, focusing on presenting the facts clearly and neutrally. There is no extensive analysis or opinion. The primary purpose is to inform readers of what has happened.
@@ -10,20 +10,20 @@ Turn the news items into Markdown-formatted output in the style of the "What's N
 
 Don't include all of the provided news items in your output. Select only the ones that seem most important, then order and categorize them appropriately.
 
-Immediately following each news item, the "What's News" section in the print version of the paper would typically reference the part of the paper where you could read more about each news item (e.g., A1, B4). You should instead provide a parenthesized, Markdown-formatted link to the news item's <url>, using "AP" as the link text.
+Immediately following each news item, the "What's News" section in the print version of the paper would typically reference the part of the paper where you could read more about each news item (e.g., A1, B4). You should instead provide a parenthesized, Markdown-formatted link to the news item's URL, using "AP" as the link text.
 
 To tie it all together, here's an example of the kind of output you should produce:
 
 ```
-# What's News
+# Thursday, August 4, 2022
 
 ## Business and Finance
 
-- **The Bank of England** raised interest rates by a half percentage point, the most in more than 25 years, even as it predicted the U.K. economy will fall into recession this year. ([AP](<url>))
-- **Warner Bros. Discovery** is exploring launching a free, ad-supported streaming service, the latest effort by a streaming giant to reach a broader audience as competition for users intensifies. ([AP](<url>))
+- **The Bank of England** raised interest rates by a half percentage point, the most in more than 25 years, even as it predicted the U.K. economy will fall into recession this year. ([AP](https://example.com))
+- **Warner Bros. Discovery** is exploring launching a free, ad-supported streaming service, the latest effort by a streaming giant to reach a broader audience as competition for users intensifies. ([AP](https://example.com))
 
 ## World News
 
-- **China encircled Taiwan** with rocket and ballistic-missile fire while testing the democratic self-governing island’s defenses with navy ships and warplanes, as Beijing protested a visit by Pelosi. ([AP](<url>))
-- **Ukrainian forces struck** a railway bridge in the southern Kherson region, the Ukrainian military said, as it seeks to cut Moscow’s supply lines in preparation for a looming counteroffensive. ([AP](<url>))
+- **China encircled Taiwan** with rocket and ballistic-missile fire while testing the democratic self-governing island’s defenses with navy ships and warplanes, as Beijing protested a visit by Pelosi. ([AP](https://example.com))
+- **Ukrainian forces struck** a railway bridge in the southern Kherson region, the Ukrainian military said, as it seeks to cut Moscow’s supply lines in preparation for a looming counteroffensive. ([AP](https://example.com))
 ```

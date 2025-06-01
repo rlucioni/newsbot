@@ -2,6 +2,16 @@
   "prod": {
     "apigateway_enabled": false,
     "aws_region": "us-east-1",
+    "events": [
+      // spring/summer -> 11:45 UTC (7:45 EDT)
+      // fall/winter -> 12:45 UTC (7:45 EST)
+      // https://docs.aws.amazon.com/scheduler/latest/UserGuide/schedule-types.html#cron-based
+      {
+        "function": "app.run",
+        "expression": "cron(45 11 ? * * *)",
+        "enabled": true
+      }
+    ],
     "exception_handler": "app.exception_handler",
     "exclude": [
       "__pycache__",
