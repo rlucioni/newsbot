@@ -17,7 +17,7 @@ rollback:
 	zappa rollback prod -n 1
 
 run:
-	python -c 'import app; app.run(with_cache=True);'
+	python -c 'import app; app.run();'
 
 schedule:
 	zappa schedule prod

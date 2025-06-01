@@ -17,6 +17,7 @@ load_dotenv('.env.private')
 
 SLACK_BOT_TOKEN = os.environ['SLACK_BOT_TOKEN']
 SLACK_CHANNEL_ID = os.environ['SLACK_CHANNEL_ID']
+USE_CACHE = False
 
 dictConfig({
     'version': 1,
@@ -176,7 +177,7 @@ def make_blocks(content):
     return blocks
 
 
-def run(with_cache=False):
+def run():
     session = requests.Session()
     session.headers.update({
         'User-Agent': (
@@ -188,7 +189,7 @@ def run(with_cache=False):
     items_xml = None
     cache_path = Path('items.xml')
 
-    if with_cache and cache_path.exists():
+    if USE_CACHE and cache_path.exists():
         logger.info('found cached news items')
         items_xml = cache_path.read_text()
 
@@ -258,7 +259,7 @@ def run(with_cache=False):
                 logger.exception('failed to handle link')
             finally:
                 link_progress.increment()
-                time.sleep(3)
+                time.sleep(2)
 
         article_timer.done()
         logger.info(f'loaded {len(articles)} articles in {round(article_timer.latency, 2)}s')
@@ -274,7 +275,7 @@ def run(with_cache=False):
 
             items_xml += item_xml
 
-        if with_cache:
+        if USE_CACHE:
             cache_path.write_text(items_xml)
 
     if not items_xml:
