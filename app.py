@@ -312,7 +312,7 @@ def make_blocks(content):
 
 
 def run():
-    items_xml = None
+    items_xml = ''
     item_cache_path = Path('items.xml')
 
     if USE_ITEM_CACHE and item_cache_path.exists():
@@ -352,7 +352,6 @@ def run():
 
         random.shuffle(all_items)
 
-        items_xml = ''
         for item in all_items:
             item_xml = ITEM_XML_TEMPLATE.format(
                 title=item['title'],
