@@ -142,7 +142,7 @@ def get_ap_items():
             logger.info(f'getting content for article link: {link_href} ({article_title})')
 
             article_response = session.get(link_href)
-            article_soup = BeautifulSoup(article_response.text, 'html.parser')
+            article_soup = BeautifulSoup(article_response.text, 'lxml')
             p_tags = article_soup.select('.RichTextStoryBody > p')
 
             contents = []
