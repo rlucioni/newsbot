@@ -19,6 +19,7 @@ load_dotenv('.env.private')
 
 SLACK_BOT_TOKEN = os.environ['SLACK_BOT_TOKEN']
 SLACK_CHANNEL_ID = os.environ['SLACK_CHANNEL_ID']
+USE_ITEM_CACHE = bool(os.environ.get('USE_ITEM_CACHE'))
 
 dictConfig({
     'version': 1,
@@ -47,7 +48,6 @@ dictConfig({
 
 logger = logging.getLogger(__name__)
 
-USE_CACHE = True
 HEADERS = {
     'User-Agent': (
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) '
@@ -170,7 +170,7 @@ def get_ap_items():
             logger.exception('failed to handle link')
         finally:
             link_progress.increment()
-            time.sleep(2)
+            time.sleep(1)
 
     item_timer.done()
     logger.info(f'loaded {len(items)} items in {round(item_timer.latency, 2)}s')
@@ -313,11 +313,11 @@ def make_blocks(content):
 
 def run():
     items_xml = None
-    cache_path = Path('items.xml')
+    item_cache_path = Path('items.xml')
 
-    if USE_CACHE and cache_path.exists():
+    if USE_ITEM_CACHE and item_cache_path.exists():
         logger.info('found cached news items')
-        items_xml = cache_path.read_text()
+        items_xml = item_cache_path.read_text()
 
     if not items_xml:
         sources = {
@@ -363,8 +363,8 @@ def run():
 
             items_xml += item_xml
 
-        if USE_CACHE:
-            cache_path.write_text(items_xml)
+        if USE_ITEM_CACHE:
+            item_cache_path.write_text(items_xml)
 
     if not items_xml:
         logger.info('aborting, no news items')
