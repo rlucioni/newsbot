@@ -1,4 +1,6 @@
-Today is {date}. You'll be given news items from various sources (e.g., AP, BBC, NHK) in <item> tags. Each item will have a title in <title> tags, a URL in <url> tags, and content in <content> tags. The news items will be in no particular order.
+{items_xml}
+
+Today is {date}. You've been given news items from various sources (e.g., AP, BBC, NHK) in <item> tags. Each item has a title in <title> tags, a URL in <url> tags, and content in <content> tags. The news items are in no particular order.
 
 Transform the date and news items into Markdown-formatted output in the style of the "What's News" section found on the front page of The Wall Street Journal. The "What's News" section serves as a concise summary of the most important news across various categories, allowing readers to quickly grasp the day's key developments. Its hallmarks are:
 

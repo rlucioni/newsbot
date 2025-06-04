@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import random
@@ -233,11 +234,59 @@ def get_date():
     return datetime.now().strftime('%A, %B %-d, %Y')
 
 
-def make_prompt():
-    with open('prompt.txt') as f:
+# TODO: only use the title? save on tokens by not sending url and content?
+def test_item(item):
+    with open('prompts/filter.txt') as f:
+        prompt_template = f.read()
+
+    item_xml = ITEM_XML_TEMPLATE.format(
+        title=item['title'],
+        url=item['url'],
+        content=item['content']
+    )
+
+    prompt = prompt_template.format(item_xml=item_xml)
+    contents = [
+        genai.types.Content(
+            role='user',
+            parts=[
+                genai.types.Part.from_text(text=prompt),
+            ]
+        ),
+    ]
+
+    response_schema = {
+        'type': 'object',
+        'properties': {
+            'isFrontPageNews': {
+                'type': 'boolean'
+            }
+        },
+        'required': [
+            'isFrontPageNews'
+        ]
+    }
+
+    res = gemini.models.generate_content(
+        model='gemini-2.5-flash-preview-05-20',
+        config=genai.types.GenerateContentConfig(
+            temperature=0,
+            response_mime_type='application/json',
+            response_schema=response_schema,
+        ),
+        contents=contents
+    )
+
+    parsed_res = json.loads(res.text)
+    if parsed_res['isFrontPageNews']:
+        return item_xml
+
+
+def make_prompt(items_xml):
+    with open('prompts/transform.txt') as f:
         prompt = f.read()
 
-    return prompt.format(date=get_date())
+    return prompt.format(items_xml=items_xml, date=get_date())
 
 
 def estimate_cost(res):
@@ -352,14 +401,28 @@ def run():
 
         random.shuffle(all_items)
 
-        for item in all_items:
-            item_xml = ITEM_XML_TEMPLATE.format(
-                title=item['title'],
-                # TODO: map from full article url to short representation, then replace, to reduce mistakes
-                url=item['url'],
-                content=item['content']
-            )
+        logger.info(f'testing {len(all_items)} news items')
+        test_timer = Timer()
+        front_page_items = []
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = [executor.submit(test_item, item) for item in all_items]
 
+            for future in as_completed(futures):
+                try:
+                    item_xml = future.result()
+                except:
+                    logger.exception('failed to test item')
+                    continue
+
+                if item_xml:
+                    front_page_items.append(item_xml)
+
+        test_timer.done()
+        logger.info(
+            f'done testing in {round(test_timer.latency, 2)}s, left with {len(front_page_items)} front-page items'
+        )
+
+        for item_xml in front_page_items:
             items_xml += item_xml
 
         if USE_ITEM_CACHE:
@@ -373,7 +436,7 @@ def run():
         genai.types.Content(
             role='user',
             parts=[
-                genai.types.Part.from_text(text=items_xml),
+                genai.types.Part.from_text(text=make_prompt(items_xml)),
             ]
         ),
     ]
@@ -382,7 +445,6 @@ def run():
     res = gemini.models.generate_content(
         model='gemini-2.5-pro-preview-05-06',
         config=genai.types.GenerateContentConfig(
-            system_instruction=make_prompt(),
             temperature=0,
         ),
         contents=contents
