@@ -427,13 +427,7 @@ def run():
 
                 parsed_res = json.loads(res.text)
                 if parsed_res['isFrontPageNews']:
-                    item_xml = ITEM_XML_TEMPLATE.format(
-                        title=item['title'],
-                        url=item['url'],
-                        content=item['content']
-                    )
-
-                    front_page_items.append(item_xml)
+                    front_page_items.append(item)
                 else:
                     logger.info(f'ignoring item: {item["url"]}')
 
@@ -443,8 +437,12 @@ def run():
             f'left with {len(front_page_items)} front-page items'
         )
 
-        for item_xml in front_page_items:
-            items_xml += item_xml
+        for item in front_page_items:
+            items_xml += ITEM_XML_TEMPLATE.format(
+                title=item['title'],
+                url=item['url'],
+                content=item['content']
+            )
 
         if USE_ITEM_CACHE:
             item_cache_path.write_text(items_xml)
