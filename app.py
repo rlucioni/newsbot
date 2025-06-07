@@ -62,7 +62,8 @@ MODELS = {
         'input_token_cost': 0.15 / 1000000,
         'output_token_cost': 3.50 / 1000000,
     },
-    'gemini-2.5-pro-preview-05-06': {
+    # <= 200k input tokens
+    'gemini-2.5-pro-preview-06-05': {
         'input_token_cost': 1.25 / 1000000,
         'output_token_cost': 10 / 1000000,
     },
@@ -113,22 +114,22 @@ def get_ap_items():
     home_soup = BeautifulSoup(home_response.text, 'lxml')
     links = home_soup.select('.PagePromo-title')
 
-    logger.info(f'found {len(links)} links')
+    logger.info(f'found {len(links)} AP links')
 
     item_timer = Timer()
-    link_progress = ProgressMeter(len(links), msg='tried {done}/{total} links ({percent}%)')
+    link_progress = ProgressMeter(len(links), msg='tried {done}/{total} AP links ({percent}%)')
 
     items = {}
     for link in links:
         try:
             a_tag = link.select_one('a')
             if not a_tag:
-                logger.info('skipping link with no <a> tag')
+                logger.info('skipping AP link with no <a> tag')
                 continue
 
             link_href = a_tag.get('href')
             if '/article/' not in link_href:
-                logger.info(f'skipping non-article link: {link_href}')
+                logger.info(f'skipping non-article AP link: {link_href}')
                 continue
 
             # Articles can be linked to multiple times. For example, a link can appear
@@ -137,10 +138,10 @@ def get_ap_items():
             article_title = link.get_text(strip=True)
             known_item = items.get(link_href)
             if known_item and len(known_item['title']) >= len(article_title):
-                logger.info(f'skipping known article link: {link_href}')
+                logger.info(f'skipping known AP article link: {link_href}')
                 continue
 
-            logger.info(f'getting content for article link: {link_href} ({article_title})')
+            logger.info(f'getting content for AP article link: {link_href} ({article_title})')
 
             article_response = session.get(link_href)
             article_soup = BeautifulSoup(article_response.text, 'lxml')
@@ -160,21 +161,22 @@ def get_ap_items():
             article_content = ' '.join(contents)
 
             if not article_content:
-                logger.info(f'got empty content for article link: {link_href}')
+                logger.info(f'got empty content for AP article link: {link_href}')
 
             items[link_href] = {
                 'title': article_title,
+                # TODO: use short urls, resolve to full urls during rendering?
                 'url': link_href,
                 'content': article_content,
             }
         except:
-            logger.exception('failed to handle link')
+            logger.exception('failed to handle AP link')
         finally:
             link_progress.increment()
             time.sleep(1)
 
     item_timer.done()
-    logger.info(f'loaded {len(items)} items in {round(item_timer.latency, 2)}s')
+    logger.info(f'loaded {len(items)} AP items in {round(item_timer.latency, 2)}s')
 
     return items
 
@@ -192,20 +194,21 @@ def get_nhk_items():
     for article in all_data:
         if now_ms - int(article['updated_at']) > (24 * 60 * 60 * 1000):
             article_path = article['page_url']
-            logger.info(f'skipping stale article: {origin}{article_path}')
+            logger.info(f'skipping stale NHK article: {origin}{article_path}')
             continue
 
         fresh_articles.append(article)
 
-    logger.info(f'found {len(fresh_articles)} fresh articles')
+    logger.info(f'found {len(fresh_articles)} fresh NHK articles')
 
     items = {}
     item_timer = Timer()
+    item_progress = ProgressMeter(len(fresh_articles), msg='tried {done}/{total} NHK items ({percent}%)')
 
     for article in fresh_articles:
         try:
             article_id = article['id']
-            logger.info(f'getting content for article {article_id}')
+            logger.info(f'getting content for NHK article {article_id}')
 
             detail_response = session.get(f'{origin}/nhkworld/data/en/news/{article_id}.json')
             detail_data = detail_response.json()['data']
@@ -220,12 +223,13 @@ def get_nhk_items():
                 'content': detail_soup.get_text(),
             }
         except:
-            logger.exception('failed to handle article')
+            logger.exception('failed to handle NHK article')
         finally:
+            item_progress.increment()
             time.sleep(1)
 
     item_timer.done()
-    logger.info(f'loaded {len(items)} items in {round(item_timer.latency, 2)}s')
+    logger.info(f'loaded {len(items)} NHK items in {round(item_timer.latency, 2)}s')
 
     return items
 
@@ -277,9 +281,7 @@ def test_item(item):
         contents=contents
     )
 
-    parsed_res = json.loads(res.text)
-    if parsed_res['isFrontPageNews']:
-        return item_xml
+    return res
 
 
 def make_prompt(items_xml):
@@ -290,7 +292,7 @@ def make_prompt(items_xml):
 
 
 def estimate_cost(res):
-    # gemini-2.5-pro-preview-05-06 appears as models/gemini-2.5-pro-preview-05-06
+    # gemini-2.5-pro-preview-05-06 appeared as models/gemini-2.5-pro-preview-05-06
     model_version = res.model_version.replace('models/', '')
     input_cost = res.usage_metadata.prompt_token_count * MODELS[model_version]['input_token_cost']
 
@@ -403,23 +405,42 @@ def run():
 
         logger.info(f'testing {len(all_items)} news items')
         test_timer = Timer()
+        test_progress = ProgressMeter(len(all_items), msg='tested {done}/{total} items ({percent}%)')
         front_page_items = []
+        test_cost = 0
+
         with ThreadPoolExecutor(max_workers=8) as executor:
-            futures = [executor.submit(test_item, item) for item in all_items]
+            futures = {executor.submit(test_item, item): item for item in all_items}
 
             for future in as_completed(futures):
-                try:
-                    item_xml = future.result()
-                except:
-                    logger.exception('failed to test item')
-                    continue
+                item = futures[future]
 
-                if item_xml:
+                try:
+                    res = future.result()
+                except:
+                    logger.exception(f'failed to test item: {item["url"]}')
+                    continue
+                finally:
+                    test_progress.increment()
+
+                test_cost += estimate_cost(res)
+
+                parsed_res = json.loads(res.text)
+                if parsed_res['isFrontPageNews']:
+                    item_xml = ITEM_XML_TEMPLATE.format(
+                        title=item['title'],
+                        url=item['url'],
+                        content=item['content']
+                    )
+
                     front_page_items.append(item_xml)
+                else:
+                    logger.info(f'ignoring item: {item["url"]}')
 
         test_timer.done()
         logger.info(
-            f'done testing in {round(test_timer.latency, 2)}s, left with {len(front_page_items)} front-page items'
+            f'done testing in {round(test_timer.latency, 2)}s (cost: ${round(test_cost, 4)}), '
+            f'left with {len(front_page_items)} front-page items'
         )
 
         for item_xml in front_page_items:
@@ -441,9 +462,13 @@ def run():
         ),
     ]
 
+    tokens_res = gemini.models.count_tokens(model='gemini-2.5-pro-preview-06-05', contents=contents)
+    logger.info(f'summarizing {tokens_res.total_tokens} tokens')
+
     generation_timer = Timer()
+    # TODO: retries?
     res = gemini.models.generate_content(
-        model='gemini-2.5-pro-preview-05-06',
+        model='gemini-2.5-pro-preview-06-05',
         config=genai.types.GenerateContentConfig(
             temperature=0,
         ),
