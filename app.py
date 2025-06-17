@@ -292,7 +292,7 @@ def make_prompt(items_xml):
 
 
 def estimate_cost(res):
-    model_version = None
+    model_version = res.model_version
     if 'gemini-2.5-pro' in res.model_version:
         model_version = 'gemini-2.5-pro'
     elif 'gemini-2.5-flash' in model_version:
