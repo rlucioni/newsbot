@@ -58,14 +58,14 @@ HEADERS = {
 
 # https://ai.google.dev/gemini-api/docs/pricing
 MODELS = {
-    'gemini-2.5-flash-preview-05-20': {
-        'input_token_cost': 0.15 / 1000000,
-        'output_token_cost': 3.50 / 1000000,
-    },
     # <= 200k input tokens
-    'gemini-2.5-pro-preview-06-05': {
+    'gemini-2.5-pro': {
         'input_token_cost': 1.25 / 1000000,
         'output_token_cost': 10 / 1000000,
+    },
+    'gemini-2.5-flash': {
+        'input_token_cost': 0.30 / 1000000,
+        'output_token_cost': 2.50 / 1000000,
     },
 }
 
@@ -272,7 +272,7 @@ def test_item(item):
     }
 
     res = gemini.models.generate_content(
-        model='gemini-2.5-flash-preview-05-20',
+        model='gemini-2.5-flash',
         config=genai.types.GenerateContentConfig(
             temperature=0,
             response_mime_type='application/json',
@@ -292,8 +292,12 @@ def make_prompt(items_xml):
 
 
 def estimate_cost(res):
-    # gemini-2.5-pro-preview-05-06 appeared as models/gemini-2.5-pro-preview-05-06
-    model_version = res.model_version.replace('models/', '')
+    model_version = None
+    if 'gemini-2.5-pro' in res.model_version:
+        model_version = 'gemini-2.5-pro'
+    elif 'gemini-2.5-flash' in model_version:
+        model_version = 'gemini-2.5-flash'
+
     input_cost = res.usage_metadata.prompt_token_count * MODELS[model_version]['input_token_cost']
 
     if res.usage_metadata.candidates_token_count:
@@ -460,13 +464,13 @@ def run():
         ),
     ]
 
-    tokens_res = gemini.models.count_tokens(model='gemini-2.5-pro-preview-06-05', contents=contents)
+    tokens_res = gemini.models.count_tokens(model='gemini-2.5-pro', contents=contents)
     logger.info(f'summarizing {tokens_res.total_tokens} tokens')
 
     generation_timer = Timer()
     # TODO: retries?
     res = gemini.models.generate_content(
-        model='gemini-2.5-pro-preview-06-05',
+        model='gemini-2.5-pro',
         config=genai.types.GenerateContentConfig(
             temperature=0,
         ),
