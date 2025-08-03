@@ -1,3 +1,19 @@
-Determine if the title in <title> tags describes international headline news. Qualifying stories should concern significant current events and should not concern celebrities.
-
 <title>{title}</title>
+
+Determine if the title in <title> tags describes international headline news. International headline news concerns significant current events. It doesn't concern celebrities. Examples of titles that describe international headline news include:
+
+- Corporation for Public Broadcasting to shut down after being defunded by Congress, targeted by Trump
+- 8.8-magnitude earthquake in Russia's Far East sets off tsunami warnings in Japan, Alaska and Hawaii
+- China, Russia begin maritime phase of naval exercise in Sea of Japan
+- Fresh clashes break out in Syria as the interim government struggles to ease tensions
+- Google loses appeal in antitrust battle with Fortnite maker
+- Japanese game maker Nintendo reports robust profits on strong Switch 2 sales
+
+Examples of titles that don't describe international headline news include:
+
+- Foreign couples flock to Denmark to get married. Copenhagen wants to save room for locals
+- Britain hopes a crackdown on people-smugglers' social media ads will help curb Channel crossings
+- After taking back land in Colombia, Indigenous prepare their youth to safeguard it
+- Female tour guides in Afghanistan lead women-only groups as some travelers return
+- Pope Leo XIV tells 1 million Catholic youths that they are "the sign a different world is possible"
+- Prosecutors seek substantial prison term for Sean "Diddy" Combs as they oppose bail

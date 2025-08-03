@@ -20,8 +20,9 @@ load_dotenv('.env.private')
 
 SLACK_BOT_TOKEN = os.environ['SLACK_BOT_TOKEN']
 SLACK_CHANNEL_ID = os.environ['SLACK_CHANNEL_ID']
-READ_ITEM_CACHE = bool(int(os.environ.get('READ_ITEM_CACHE', 0)))
-WRITE_ITEM_CACHE = bool(int(os.environ.get('WRITE_ITEM_CACHE', 0)))
+READ_ITEM_CACHE = bool(int(os.environ.get('READ_ITEM_CACHE', False)))
+WRITE_ITEM_CACHE = bool(int(os.environ.get('WRITE_ITEM_CACHE', False)))
+REMEMBER_YESTERDAY = bool(int(os.environ.get('REMEMBER_YESTERDAY', True)))
 
 dictConfig({
     'version': 1,
@@ -65,8 +66,12 @@ MODELS = {
         'output_token_cost': 10 / 1000000,
     },
     'gemini-2.5-flash': {
-        'input_token_cost': 0.30 / 1000000,
-        'output_token_cost': 2.50 / 1000000,
+        'input_token_cost': 0.3 / 1000000,
+        'output_token_cost': 2.5 / 1000000,
+    },
+    'gemini-2.5-flash-lite': {
+        'input_token_cost': 0.1 / 1000000,
+        'output_token_cost': 0.4 / 1000000,
     },
 }
 
@@ -256,17 +261,17 @@ def test_item(item):
     response_schema = {
         'type': 'object',
         'properties': {
-            'isFrontPageNews': {
+            'isHeadlineNews': {
                 'type': 'boolean'
             }
         },
         'required': [
-            'isFrontPageNews'
+            'isHeadlineNews'
         ]
     }
 
     res = gemini.models.generate_content(
-        model='gemini-2.5-flash',
+        model='gemini-2.5-flash-lite',
         config=genai.types.GenerateContentConfig(
             temperature=0,
             response_mime_type='application/json',
@@ -275,20 +280,19 @@ def test_item(item):
         contents=contents
     )
 
-    return res
-
-
-def make_prompt(items_xml):
-    with open('prompts/transform.txt') as f:
-        prompt = f.read()
-
-    return prompt.format(items_xml=items_xml, date=get_date())
+    parsed = json.loads(res.text)
+    return {
+        'ok': parsed['isHeadlineNews'],
+        'cost': estimate_cost(res),
+    }
 
 
 def estimate_cost(res):
     model_version = res.model_version
     if 'gemini-2.5-pro' in res.model_version:
         model_version = 'gemini-2.5-pro'
+    elif 'gemini-2.5-flash-lite' in model_version:
+        model_version = 'gemini-2.5-flash-lite'
     elif 'gemini-2.5-flash' in model_version:
         model_version = 'gemini-2.5-flash'
 
@@ -364,9 +368,12 @@ def run():
     items_xml = ''
     item_cache_path = Path('items.xml')
 
-    if READ_ITEM_CACHE and item_cache_path.exists():
-        logger.info('found cached news items')
-        items_xml = item_cache_path.read_text()
+    if READ_ITEM_CACHE:
+        logger.info('checking for cached news items')
+
+        if item_cache_path.exists():
+            logger.info('found cached news items')
+            items_xml = item_cache_path.read_text()
 
     if not items_xml:
         sources = {
@@ -421,10 +428,8 @@ def run():
                 finally:
                     test_progress.increment()
 
-                test_cost += estimate_cost(res)
-
-                parsed_res = json.loads(res.text)
-                if parsed_res['isFrontPageNews']:
+                if res['ok']:
+                    test_cost += res['cost']
                     front_page_items.append(item)
                 else:
                     logger.info(f'ignoring item: {item["url"]}')
@@ -443,17 +448,41 @@ def run():
             )
 
         if WRITE_ITEM_CACHE:
+            logger.info('writing cached news items')
             item_cache_path.write_text(items_xml)
 
     if not items_xml:
         logger.info('aborting, no news items')
         return
 
+    with open('prompts/transform.txt') as f:
+        prompt_template = f.read()
+
+    yesterday = ''
+    if REMEMBER_YESTERDAY:
+        logger.info('checking for news from yesterday')
+
+        try:
+            last_message = slack.conversations_history(channel=SLACK_CHANNEL_ID, limit=1)['messages'][0]
+            if last_message['text'].startswith('News for '):
+                text_parts = []
+                for block in last_message['blocks']:
+                    if block['type'] in ['header', 'section']:
+                        text_parts.append(block['text']['text'])
+
+                yesterday = '\n'.join(text_parts)
+            else:
+                logger.info('last slack message is not news from yesterday')
+        except:
+            logger.exception('failed to get news from yesterday')
+
+    prompt = prompt_template.format(items_xml=items_xml, yesterday=yesterday, date=get_date())
+
     contents = [
         genai.types.Content(
             role='user',
             parts=[
-                genai.types.Part.from_text(text=make_prompt(items_xml)),
+                genai.types.Part.from_text(text=prompt),
             ]
         ),
     ]

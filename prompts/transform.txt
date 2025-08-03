@@ -1,8 +1,10 @@
 {items_xml}
 
-Today is {date}. You've been given news items from various sources (e.g., AP, BBC, NHK) in <item> tags. Each item has a title in <title> tags, a URL in <url> tags, and content in <content> tags. The news items are in no particular order.
+<yesterday>{yesterday}</yesterday>
 
-Transform the date and news items into Markdown-formatted output in the style of the "What's News" section found on the front page of The Wall Street Journal. The "What's News" section serves as a concise summary of the most important news across various categories, allowing readers to quickly grasp the day's key developments. Its hallmarks are:
+Today is {date}. You've been given today's news from various sources (e.g., AP, BBC, NHK) in <item> tags. Each item has a title in <title> tags, a URL in <url> tags, and content in <content> tags. The items are in no particular order. Yesterday's news, if any, is in <yesterday> tags.
+
+Transform today's date and news into Markdown-formatted output in the style of the "What's News" section found on the front page of The Wall Street Journal. The "What's News" section serves as a concise summary of the most important news across various categories, allowing readers to quickly grasp the day's key developments. Its hallmarks are:
 
 1. Categorization: "What's News" is composed of news briefs divided into categories to help readers quickly find the areas they are most interested in. Example categories include "Business & Finance" (e.g., stock markets, company news, economic indicators, and financial regulations), "Politics & Policy" (e.g., government actions, legislation, elections, and international relations), and "World News" (e.g., significant events happening globally). However, these are just examples. Feel free to make up categories that best suit the day's news.
 2. Brevity and conciseness: The writing in the "What's News" section is characterized by its brevity. Each brief is just one or two sentences, delivering the essential facts without extensive detail. This allows for a large number of updates to fit in a compact space.
@@ -10,7 +12,7 @@ Transform the date and news items into Markdown-formatted output in the style of
 4. Emphasis on key information: Each brief highlights the most important aspects of a story - the who, what, when, where, and why - in a very condensed format.
 5. Bolded subjects: The "What's News" section uses **bold text** at the beginning of each brief to enhance readability and quickly draw the reader's eye to key information. Bold text at the beginning of each brief highlights the brief's subject. For example, "**U.S. stocks** closed higher..." or "**The Senate** passed a bipartisan bill...". This immediately tells the reader what the news is about.
 
-There's no need to include all of the provided news items in your output. Use only the ones that seem most important, categorized and ordered appropriately. A story covered by multiple sources (e.g., AP and NHK) is probably important.
+You don't have to include all of today's news in your output. Prefer stories that are appropriate for the "What's News" section. A story covered by multiple sources (e.g., AP and NHK) is probably important and should be included. Don't repeat any of yesterday's headlines. If a story in today's news appeared in yesterday's news, you should only include it if there are new details to cover.
 
 Immediately following each brief, the "What's News" section references the part of the paper where you can read the full story (e.g., A1). You should instead provide parenthesized, Markdown-formatted links to news item URLs that can be followed to read more, using the name of the source (e.g., AP, BBC, NHK) as the link text. If a brief is covered by multiple sources, include comma-separated links to each source in the parentheses (e.g., `([AP](https://example.com), [NHK](https://example.com))`). However, don't link to the same source more than once per brief. For example, if there are two AP news items that are relevant to a brief, only link to the most relevant one (e.g., output `([AP](https://example.com))`, not `([AP](https://example.com), [AP](https://example.com))`)
 
@@ -29,3 +31,5 @@ To tie it all together, here's an example of the kind of output you should produ
 - **China encircled Taiwan** with rocket and ballistic-missile fire while testing the democratic self-governing island’s defenses with navy ships and warplanes, as Beijing protested a visit by Pelosi. ([AP](https://example.com))
 - **Ukrainian forces struck** a railway bridge in the southern Kherson region, the Ukrainian military said, as it seeks to cut Moscow’s supply lines in preparation for a looming counteroffensive. ([NHK](https://example.com), [BBC](https://example.com))
 ```
+
+Only use H1 (`#`) and H2 (`##`) headings as shown here.
