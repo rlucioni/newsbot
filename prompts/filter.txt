@@ -1,3 +1,3 @@
-Consider the following news item in <item> tags. Is the content in <content> tags significant enough to be front-page news on the national or international level?
+Determine if the title in <title> tags describes international headline news. Qualifying stories should concern significant current events and should not concern celebrities.
 
-{item_xml}
+<title>{title}</title>

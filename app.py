@@ -20,7 +20,8 @@ load_dotenv('.env.private')
 
 SLACK_BOT_TOKEN = os.environ['SLACK_BOT_TOKEN']
 SLACK_CHANNEL_ID = os.environ['SLACK_CHANNEL_ID']
-USE_ITEM_CACHE = bool(os.environ.get('USE_ITEM_CACHE'))
+READ_ITEM_CACHE = bool(int(os.environ.get('READ_ITEM_CACHE', 0)))
+WRITE_ITEM_CACHE = bool(int(os.environ.get('WRITE_ITEM_CACHE', 0)))
 
 dictConfig({
     'version': 1,
@@ -238,18 +239,11 @@ def get_date():
     return datetime.now().strftime('%A, %B %-d, %Y')
 
 
-# TODO: only use the title? save on tokens by not sending url and content?
 def test_item(item):
     with open('prompts/filter.txt') as f:
         prompt_template = f.read()
 
-    item_xml = ITEM_XML_TEMPLATE.format(
-        title=item['title'],
-        url=item['url'],
-        content=item['content']
-    )
-
-    prompt = prompt_template.format(item_xml=item_xml)
+    prompt = prompt_template.format(title=item['title'])
     contents = [
         genai.types.Content(
             role='user',
@@ -370,7 +364,7 @@ def run():
     items_xml = ''
     item_cache_path = Path('items.xml')
 
-    if USE_ITEM_CACHE and item_cache_path.exists():
+    if READ_ITEM_CACHE and item_cache_path.exists():
         logger.info('found cached news items')
         items_xml = item_cache_path.read_text()
 
@@ -448,7 +442,7 @@ def run():
                 content=item['content']
             )
 
-        if USE_ITEM_CACHE:
+        if WRITE_ITEM_CACHE:
             item_cache_path.write_text(items_xml)
 
     if not items_xml:
